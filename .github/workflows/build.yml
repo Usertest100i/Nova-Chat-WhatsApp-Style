@@ -35,7 +35,7 @@ jobs:
         working-directory: upstream
         run: |
           chmod +x ./gradlew
-          ./gradlew build --no-daemon
+          ./gradlew spotlessApply build --no-daemon
       - name: Verify and name real Fabric JAR
         run: python scripts/package_release.py upstream nova-dist
       - name: Preserve full GPL corresponding source

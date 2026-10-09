@@ -1,0 +1,55 @@
+name: Build Nova Chat Fabric Client
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run Nova Chat patch and UI tests
+        run: python -m unittest discover -s tests -v
+      - name: Clone original GPL client sources
+        run: git clone --depth 1 --branch 26.3 https://github.com/Wurst-Imperium/Wurst7.git upstream
+      - name: Verify upstream and inject Nova Chat
+        run: |
+          python scripts/verify_upstream.py upstream
+          python scripts/apply_nova.py upstream
+          git -C upstream rev-parse HEAD | tee upstream-commit.txt
+      - name: Prepare Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Build mod using upstream Gradle wrapper
+        working-directory: upstream
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build --no-daemon
+      - name: Verify and name real Fabric JAR
+        run: python scripts/package_release.py upstream nova-dist
+      - name: Preserve full GPL corresponding source
+        run: |
+          tar -czf nova-modified-source.tar.gz --exclude='.git' --exclude='.gradle' --exclude='build' -C upstream .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nova-Chat-Fabric-26.3
+          path: nova-dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nova-Chat-Corresponding-Source
+          path: |
+            nova-modified-source.tar.gz
+            upstream-commit.txt
+          if-no-files-found: error
